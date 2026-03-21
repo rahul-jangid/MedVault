@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Basic information about the user, including health metrics.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user's unique ID." },
+        "displayName": { "type": "string", "description": "The user's display name." },
+        "email": { "type": "string", "description": "The user's email address." },
+        "bloodGroup": { "type": "string", "description": "The user's blood group." },
+        "dateOfBirth": { "type": "string", "format": "date", "description": "The user's date of birth." },
+        "allergies": { "type": "array", "items": { "type": "string" }, "description": "List of known allergies." }
+      },
+      "required": ["uid", "email"]
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "A medical prescription record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "hospitalName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "medications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "dosage": { "type": "string" },
+              "frequency": { "type": "string" },
+              "duration": { "type": "string" }
+            }
+          }
+        },
+        "notes": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "aiSummary": { "type": "string" }
+      },
+      "required": ["userId", "doctorName", "date"]
+    },
+    "LabReport": {
+      "title": "Lab Report",
+      "description": "A medical lab report or test result.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "testName": { "type": "string" },
+        "labName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "parameter": { "type": "string" },
+              "value": { "type": "string" },
+              "unit": { "type": "string" },
+              "referenceRange": { "type": "string" },
+              "status": { "type": "string", "enum": ["Normal", "High", "Low", "Critical"] }
+            }
+          }
+        },
+        "imageUrl": { "type": "string" },
+        "aiAnalysis": { "type": "string" }
+      },
+      "required": ["userId", "testName", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/users/{userId}/prescriptions/{prescriptionId}": {
+      "schema": "Prescription",
+      "description": "User prescriptions."
+    },
+    "/users/{userId}/reports/{reportId}": {
+      "schema": "LabReport",
+      "description": "User lab reports."
+    }
+  }
+}

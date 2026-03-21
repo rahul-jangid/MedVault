@@ -1,0 +1,7 @@
+{
+  "name": "MedVault",
+  "description": "A secure platform for managing medical prescriptions, lab reports, and health history with AI-powered insights.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
