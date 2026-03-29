@@ -329,6 +329,7 @@ function AppContent() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [reports, setReports] = useState<LabReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prescriptions' | 'reports' | 'profile'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -339,16 +340,37 @@ function AppContent() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
   useEffect(() => {
+    console.log("App initialized, setting up auth listener...");
+    let unsubPres: (() => void) | null = null;
+    let unsubReports: (() => void) | null = null;
+
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.warn("Loading timeout reached, forcing loading to false.");
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      console.log("Auth state changed:", user ? `User ${user.uid}` : "No user");
+      
+      // Cleanup previous listeners if any
+      if (unsubPres) unsubPres();
+      if (unsubReports) unsubReports();
+      
       setUser(user);
+      
       if (user) {
-        // Fetch/Create profile
-        const profileRef = doc(db, 'users', user.uid);
         try {
+          const profileRef = doc(db, 'users', user.uid);
+          console.log("Fetching profile for:", user.uid);
+          
           const profileSnap = await getDoc(profileRef);
           if (profileSnap.exists()) {
+            console.log("Profile found");
             setProfile(profileSnap.data() as UserProfile);
           } else {
+            console.log("Creating new profile");
             const newProfile: UserProfile = {
               uid: user.uid,
               displayName: user.displayName || 'User',
@@ -362,32 +384,45 @@ function AppContent() {
           const presRef = collection(db, 'users', user.uid, 'prescriptions');
           const reportsRef = collection(db, 'users', user.uid, 'reports');
 
-          const unsubPres = onSnapshot(presRef, (snap) => {
+          console.log("Setting up snapshot listeners");
+          unsubPres = onSnapshot(presRef, (snap) => {
             setPrescriptions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Prescription)));
-          }, (err) => handleFirestoreError(err, OperationType.LIST, 'prescriptions'));
+          }, (err) => {
+            console.error("Prescriptions snapshot error:", err);
+            handleFirestoreError(err, OperationType.LIST, 'prescriptions');
+          });
 
-          const unsubReports = onSnapshot(reportsRef, (snap) => {
+          unsubReports = onSnapshot(reportsRef, (snap) => {
             setReports(snap.docs.map(d => ({ id: d.id, ...d.data() } as LabReport)));
-          }, (err) => handleFirestoreError(err, OperationType.LIST, 'reports'));
+          }, (err) => {
+            console.error("Reports snapshot error:", err);
+            handleFirestoreError(err, OperationType.LIST, 'reports');
+          });
 
           setLoading(false);
-          return () => {
-            unsubPres();
-            unsubReports();
-          };
+          clearTimeout(timeoutId);
         } catch (err) {
-          console.error("Profile Error:", err);
+          console.error("Initialization Error:", err);
+          setLoadingError(err instanceof Error ? err.message : String(err));
           setLoading(false);
+          clearTimeout(timeoutId);
         }
       } else {
         setProfile(null);
         setPrescriptions([]);
         setReports([]);
         setLoading(false);
+        clearTimeout(timeoutId);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("Cleaning up App effect");
+      unsubscribe();
+      if (unsubPres) unsubPres();
+      if (unsubReports) unsubReports();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleLogin = async () => {
@@ -432,6 +467,11 @@ function AppContent() {
           <Loader2 size={48} />
         </motion.div>
         <p className="text-slate-500 font-medium animate-pulse">Securing your medical vault...</p>
+        {loadingError && (
+          <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-2xl text-xs max-w-xs text-center">
+            Error: {loadingError}
+          </div>
+        )}
       </div>
     );
   }
