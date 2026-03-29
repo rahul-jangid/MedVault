@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
+import { Browser } from '@capacitor/browser';
 import { 
   auth, 
   db, 
@@ -465,14 +466,16 @@ function AppContent() {
     
     try {
       if (method === 'manual') {
-        // Force navigation to the auth domain
+        // Force navigation to the auth domain using the Browser plugin
+        // This opens in a "Secure Browser" (Safari) which Google trusts
         const config = (await import('../firebase-applet-config.json')).default;
-        // Use https://localhost as the redirect URL since we updated capacitor.config.ts
         const redirectUrl = "https://localhost";
         const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(redirectUrl)}`;
-        console.log("Manual redirect to:", manualUrl);
-        setDebugInfo(prev => prev + `\nManual Nav: ${redirectUrl}`);
-        window.location.href = manualUrl;
+        
+        console.log("Manual redirect via Browser plugin to:", manualUrl);
+        setDebugInfo(prev => prev + `\nManual Browser: ${redirectUrl}`);
+        
+        await Browser.open({ url: manualUrl });
         return;
       }
 
