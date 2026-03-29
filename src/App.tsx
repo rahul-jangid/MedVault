@@ -40,7 +40,8 @@ import {
   OperationType,
   clearAuth
 } from './firebase';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
 import { LineChart, 
@@ -472,9 +473,7 @@ function AppContent() {
     
     console.log(`Attempting login with method: ${method}`);
     console.log("Auth object:", !!auth);
-    
-    const provider = new GoogleAuthProvider();
-    console.log("Provider object created:", !!provider);
+    console.log("Is native platform:", Capacitor.isNativePlatform());
 
     if (!auth) {
       setLoadingError("Auth not initialized properly.");
@@ -483,12 +482,34 @@ function AppContent() {
     }
     
     try {
-      if (method === 'redirect') {
+      // Use native Google Sign-In on iOS/Android (Capacitor)
+      if (Capacitor.isNativePlatform()) {
+        console.log("Using native Google Sign-In via Capacitor...");
+        setDebugInfo(prev => prev + "\nNative Sign-In...");
+        
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        console.log("Native sign-in result:", !!result.credential);
+        setDebugInfo(prev => prev + "\nNative credential received");
+        
+        // Use the credential to sign in with the Firebase web SDK
+        const idToken = result.credential?.idToken;
+        if (idToken) {
+          const credential = GoogleAuthProvider.credential(idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          console.log("Firebase web SDK sign-in success:", userCredential.user.uid);
+          setDebugInfo(prev => prev + "\nSign-in success: " + userCredential.user.uid);
+          setUser(userCredential.user);
+        } else {
+          throw new Error("No ID token received from native sign-in.");
+        }
+      } else if (method === 'redirect') {
+        const provider = new GoogleAuthProvider();
         console.log("Calling signInWithRedirect...");
         setDebugInfo(prev => prev + "\nCalling Redirect...");
         await signInWithRedirect(auth, provider);
         console.log("signInWithRedirect call completed (app should redirect now)");
       } else {
+        const provider = new GoogleAuthProvider();
         console.log("Calling signInWithPopup...");
         setDebugInfo(prev => prev + "\nCalling Popup...");
         
@@ -506,12 +527,16 @@ function AppContent() {
       }
     } catch (error: any) {
       console.error("Login Error:", error);
-      setDebugInfo(prev => prev + `\nLogin Error: ${error.code}`);
+      setDebugInfo(prev => prev + `\nLogin Error: ${error.code || error.message}`);
       
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
         setLoadingError("Popup was blocked. Please try the 'Redirect Login' button below.");
       } else if (error.code === 'auth/disallowed-useragent') {
         setLoadingError("Google is blocking this browser. Please try 'Redirect Login' or check your User Agent settings.");
+      } else if (error.message?.includes('canceled') || error.message?.includes('cancelled')) {
+        // User cancelled native sign-in — don't show error
+        console.log("User cancelled sign-in");
+        setDebugInfo(prev => prev + "\nUser cancelled");
       } else {
         setLoadingError(`Login failed: ${error.message}`);
       }
