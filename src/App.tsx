@@ -336,7 +336,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<'popup' | 'redirect' | null>(null);
+  const [loginMethod, setLoginMethod] = useState<'popup' | 'redirect' | 'manual' | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prescriptions' | 'reports' | 'profile'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -458,13 +458,27 @@ function AppContent() {
     };
   }, []);
 
-  const handleLogin = async (method: 'popup' | 'redirect' = 'popup') => {
+  const handleLogin = async (method: 'popup' | 'redirect' | 'manual' = 'popup') => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
     setLoginMethod(method);
     setDebugInfo(prev => prev + `\nLogin Start: ${method}`);
     
     try {
+      if (method === 'manual') {
+        // Force navigation to the auth domain inside the app's WebView
+        // This allows the redirect to https://localhost to work correctly
+        const config = (await import('../firebase-applet-config.json')).default;
+        const redirectUrl = "https://localhost";
+        const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(redirectUrl)}`;
+        
+        console.log("Manual redirect inside WebView to:", manualUrl);
+        setDebugInfo(prev => prev + `\nManual Nav: ${redirectUrl}`);
+        
+        window.location.href = manualUrl;
+        return;
+      }
+
       if (method === 'redirect') {
         console.log("Using signInWithRedirect");
         await signInWithRedirect(auth, googleProvider);
@@ -559,6 +573,15 @@ function AppContent() {
               disabled={isLoggingIn}
             >
               {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
+            </Button>
+
+            <Button 
+              onClick={() => handleLogin('manual')} 
+              variant="ghost"
+              className="w-full py-2 text-sm text-slate-400" 
+              disabled={isLoggingIn}
+            >
+              Emergency Manual Login
             </Button>
           </div>
 

@@ -9,6 +9,8 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     hostname: 'localhost',
     allowNavigation: [
+      'localhost',
+      'https://localhost',
       'gen-lang-client-0597938563.firebaseapp.com',
       '*.firebaseapp.com',
       '*.google.com',
