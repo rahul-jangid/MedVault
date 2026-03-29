@@ -466,16 +466,16 @@ function AppContent() {
     
     try {
       if (method === 'manual') {
-        // Force navigation to the auth domain using the Browser plugin
-        // This opens in a "Secure Browser" (Safari) which Google trusts
+        // Force navigation to the auth domain inside the app's WebView
+        // This allows the redirect to https://localhost to work correctly
         const config = (await import('../firebase-applet-config.json')).default;
         const redirectUrl = "https://localhost";
         const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(redirectUrl)}`;
         
-        console.log("Manual redirect via Browser plugin to:", manualUrl);
-        setDebugInfo(prev => prev + `\nManual Browser: ${redirectUrl}`);
+        console.log("Manual redirect inside WebView to:", manualUrl);
+        setDebugInfo(prev => prev + `\nManual Nav: ${redirectUrl}`);
         
-        await Browser.open({ url: manualUrl });
+        window.location.href = manualUrl;
         return;
       }
 
