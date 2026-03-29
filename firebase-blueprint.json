@@ -38,6 +38,7 @@
         },
         "notes": { "type": "string" },
         "imageUrl": { "type": "string" },
+        "imageData": { "type": "string", "description": "Base64 encoded image data." },
         "aiSummary": { "type": "string" }
       },
       "required": ["userId", "doctorName", "date"]
@@ -66,6 +67,7 @@
           }
         },
         "imageUrl": { "type": "string" },
+        "imageData": { "type": "string", "description": "Base64 encoded image data." },
         "aiAnalysis": { "type": "string" }
       },
       "required": ["userId", "testName", "date"]

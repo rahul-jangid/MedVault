@@ -43,8 +43,7 @@ import {
 } from './firebase';
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
-import { 
-  LineChart, 
+import { LineChart, 
   Line, 
   XAxis, 
   YAxis, 
@@ -54,6 +53,9 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { Capacitor } from '@capacitor/core';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera } from 'lucide-react';
 
 // --- Types ---
 
@@ -73,6 +75,7 @@ interface Prescription {
   medications: Medication[];
   notes?: string;
   imageUrl?: string;
+  imageData?: string;
   aiSummary?: string;
 }
 
@@ -92,6 +95,7 @@ interface LabReport {
   date: string;
   results: LabResult[];
   imageUrl?: string;
+  imageData?: string;
   aiAnalysis?: string;
 }
 
@@ -133,6 +137,43 @@ async function analyzeMedicalDocument(text: string, type: 'prescription' | 'repo
   } catch (error) {
     console.error("AI Analysis Error:", error);
     return "Failed to generate AI analysis. Please try again later.";
+  }
+}
+
+async function scanPrescriptionImage(base64Image: string) {
+  const model = "gemini-3-flash-preview";
+  const prompt = `You are an expert medical transcriptionist. Analyze this prescription image and extract the following information in JSON format:
+  {
+    "doctorName": "string",
+    "hospitalName": "string",
+    "date": "YYYY-MM-DD",
+    "medications": [
+      { "name": "string", "dosage": "string", "frequency": "string", "duration": "string" }
+    ],
+    "notes": "string"
+  }
+  If handwriting is difficult, use your medical knowledge to infer the most likely medication names and dosages. If you absolutely cannot read a field, leave it as an empty string. Return ONLY the JSON object.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: base64Image.split(',')[1] || base64Image
+          }
+        }
+      ],
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("AI Scan Error:", error);
+    throw new Error("Failed to scan prescription. Please ensure the image is clear.");
   }
 }
 
@@ -226,6 +267,7 @@ export default function App() {
   
   // Modals
   const [isAddPrescriptionOpen, setIsAddPrescriptionOpen] = useState(false);
+  const [isScanPrescriptionOpen, setIsScanPrescriptionOpen] = useState(false);
   const [isAddReportOpen, setIsAddReportOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
@@ -431,6 +473,16 @@ export default function App() {
                 className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 w-64 transition-all"
               />
             </div>
+            {activeTab === 'prescriptions' && (
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsScanPrescriptionOpen(true)}
+                icon={BrainCircuit}
+                className="text-indigo-600 border-indigo-100"
+              >
+                <span className="hidden sm:inline">Scan AI</span>
+              </Button>
+            )}
             <Button 
               variant="accent" 
               onClick={() => activeTab === 'reports' ? setIsAddReportOpen(true) : setIsAddPrescriptionOpen(true)}
@@ -721,6 +773,11 @@ export default function App() {
         onClose={() => setIsAddPrescriptionOpen(false)} 
         userId={user.uid} 
       />
+      <ScanPrescriptionModal
+        isOpen={isScanPrescriptionOpen}
+        onClose={() => setIsScanPrescriptionOpen(false)}
+        userId={user.uid}
+      />
       <AddReportModal 
         isOpen={isAddReportOpen} 
         onClose={() => setIsAddReportOpen(false)} 
@@ -881,6 +938,299 @@ const ProfileItem = ({ label, value }: any) => (
 );
 
 // --- Form Modals ---
+
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Compress quality to ensure it's under 800KB (Firestore limit is 1MB)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
+};
+
+const ScanPrescriptionModal = ({ isOpen, onClose, userId }: any) => {
+  const [step, setStep] = useState<'upload' | 'scanning' | 'review'>('upload');
+  const [image, setImage] = useState<string | null>(null);
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleNativeCamera = async () => {
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt
+      });
+      
+      if (image.dataUrl) {
+        setStep('scanning');
+        setError(null);
+        setImage(image.dataUrl);
+        const data = await scanPrescriptionImage(image.dataUrl);
+        setExtractedData(data);
+        setStep('review');
+      }
+    } catch (err: any) {
+      console.error(err);
+      if (err.message !== 'User cancelled photos app') {
+        setError(err.message || "Failed to access camera.");
+      }
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setStep('scanning');
+      setError(null);
+      const compressed = await compressImage(file);
+      setImage(compressed);
+      
+      const data = await scanPrescriptionImage(compressed);
+      setExtractedData(data);
+      setStep('review');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to scan prescription. Please try again.");
+      setStep('upload');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!extractedData || !userId) return;
+    setIsSaving(true);
+    try {
+      const docRef = await addDoc(collection(db, 'users', userId, 'prescriptions'), {
+        ...extractedData,
+        userId,
+        imageData: image,
+        createdAt: new Date().toISOString()
+      });
+
+      // Trigger AI Summary in background
+      const summary = await analyzeMedicalDocument(JSON.stringify(extractedData), 'prescription');
+      await updateDoc(docRef, { aiSummary: summary });
+
+      onClose();
+      reset();
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'prescriptions');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const reset = () => {
+    setStep('upload');
+    setImage(null);
+    setExtractedData(null);
+    setError(null);
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => { onClose(); reset(); }} title="Scan Prescription with AI">
+      <div className="space-y-6">
+        {step === 'upload' && (
+          <div className="space-y-4">
+            {Capacitor.isNativePlatform() && (
+              <Button 
+                onClick={handleNativeCamera}
+                className="w-full py-6 rounded-3xl flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+              >
+                <Camera size={24} />
+                <span className="text-lg font-semibold">Take Photo</span>
+              </Button>
+            )}
+            
+            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative group">
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleFileChange}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
+                <Upload size={32} />
+              </div>
+              <p className="font-bold text-slate-900">
+                {Capacitor.isNativePlatform() ? 'Or Choose from Gallery' : 'Upload Prescription Photo'}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Take a clear photo of the handwritten note</p>
+              {error && (
+                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm">
+                  <AlertCircle size={16} />
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === 'scanning' && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, 10, -10, 0]
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-indigo-600 mb-6"
+            >
+              <BrainCircuit size={64} />
+            </motion.div>
+            <h4 className="text-xl font-bold text-slate-900">AI is reading handwriting...</h4>
+            <p className="text-slate-500 mt-2">Decoding medical abbreviations and dosages</p>
+            <div className="w-48 h-1.5 bg-slate-100 rounded-full mt-6 overflow-hidden">
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                className="w-full h-full bg-indigo-600"
+              />
+            </div>
+          </div>
+        )}
+
+        {step === 'review' && extractedData && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Original Photo</h5>
+                <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4]">
+                  <img src={image!} alt="Scanned" className="w-full h-full object-cover" />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Extracted Data</h5>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Doctor</label>
+                    <input 
+                      value={extractedData.doctorName}
+                      onChange={e => setExtractedData({...extractedData, doctorName: e.target.value})}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Hospital</label>
+                    <input 
+                      value={extractedData.hospitalName}
+                      onChange={e => setExtractedData({...extractedData, hospitalName: e.target.value})}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Date</label>
+                    <input 
+                      type="date"
+                      value={extractedData.date}
+                      onChange={e => setExtractedData({...extractedData, date: e.target.value})}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Medications</h5>
+              <div className="space-y-2">
+                {extractedData.medications.map((med: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-slate-50 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <input 
+                      placeholder="Name"
+                      value={med.name}
+                      onChange={e => {
+                        const newMeds = [...extractedData.medications];
+                        newMeds[idx].name = e.target.value;
+                        setExtractedData({...extractedData, medications: newMeds});
+                      }}
+                      className="p-1.5 bg-white border border-slate-200 rounded text-xs"
+                    />
+                    <input 
+                      placeholder="Dosage"
+                      value={med.dosage}
+                      onChange={e => {
+                        const newMeds = [...extractedData.medications];
+                        newMeds[idx].dosage = e.target.value;
+                        setExtractedData({...extractedData, medications: newMeds});
+                      }}
+                      className="p-1.5 bg-white border border-slate-200 rounded text-xs"
+                    />
+                    <input 
+                      placeholder="Freq"
+                      value={med.frequency}
+                      onChange={e => {
+                        const newMeds = [...extractedData.medications];
+                        newMeds[idx].frequency = e.target.value;
+                        setExtractedData({...extractedData, medications: newMeds});
+                      }}
+                      className="p-1.5 bg-white border border-slate-200 rounded text-xs"
+                    />
+                    <input 
+                      placeholder="Dur"
+                      value={med.duration}
+                      onChange={e => {
+                        const newMeds = [...extractedData.medications];
+                        newMeds[idx].duration = e.target.value;
+                        setExtractedData({...extractedData, medications: newMeds});
+                      }}
+                      className="p-1.5 bg-white border border-slate-200 rounded text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={reset}>Retake</Button>
+              <Button variant="primary" className="flex-[2]" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? <Loader2 className="animate-spin" /> : 'Confirm & Save to Vault'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 const AddPrescriptionModal = ({ isOpen, onClose, userId }: any) => {
   const [formData, setFormData] = useState({
@@ -1220,6 +1570,15 @@ const ViewDetailModal = ({ item, onClose, onDelete }: any) => {
             <Trash2 size={20} />
           </Button>
         </div>
+
+        {item.imageData && (
+          <div className="space-y-3">
+            <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Original Document</h5>
+            <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96 flex items-center justify-center">
+              <img src={item.imageData} alt="Document" className="max-w-full max-h-full object-contain" />
+            </div>
+          </div>
+        )}
 
         {isPrescription ? (
           <div className="space-y-6">

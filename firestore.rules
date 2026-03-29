@@ -25,6 +25,7 @@ service cloud.firestore {
     //   - medications: list (optional) - List of medications
     //   - notes: string (optional) - Additional notes
     //   - imageUrl: string (optional) - Image link
+    //   - imageData: string (optional) - Base64 encoded image data
     //   - aiSummary: string (optional) - AI generated summary
     //
     // Collection: /users/{userId}/reports/{reportId}
@@ -35,6 +36,7 @@ service cloud.firestore {
     //   - date: string (required, ISO 8601) - Report date
     //   - results: list (optional) - Test results
     //   - imageUrl: string (optional) - Image link
+    //   - imageData: string (optional) - Base64 encoded image data
     //   - aiAnalysis: string (optional) - AI generated analysis
     //
     // ===============================================================
@@ -84,6 +86,7 @@ service cloud.firestore {
              (!('medications' in data) || data.medications is list) &&
              (!('notes' in data) || (data.notes is string && data.notes.size() < 2000)) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('imageData' in data) || (data.imageData is string && data.imageData.size() < 800000)) &&
              (!('aiSummary' in data) || (data.aiSummary is string && data.aiSummary.size() < 5000));
     }
 
@@ -94,6 +97,7 @@ service cloud.firestore {
              (!('labName' in data) || (data.labName is string && data.labName.size() < 100)) &&
              (!('results' in data) || data.results is list) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('imageData' in data) || (data.imageData is string && data.imageData.size() < 800000)) &&
              (!('aiAnalysis' in data) || (data.aiAnalysis is string && data.aiAnalysis.size() < 5000));
     }
 
