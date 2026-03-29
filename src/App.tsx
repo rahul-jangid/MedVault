@@ -110,9 +110,24 @@ interface UserProfile {
 
 // --- AI Service ---
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn("GEMINI_API_KEY is missing. AI features will be disabled.");
+    return null;
+  }
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 async function analyzeMedicalDocument(text: string, type: 'prescription' | 'report') {
+  const ai = getAI();
+  if (!ai) return "AI Analysis is unavailable because the API key is not configured.";
+  
   const model = "gemini-3-flash-preview";
   const prompt = type === 'prescription' 
     ? `Analyze this medical prescription text and provide a clear, patient-friendly summary. Include:
@@ -141,6 +156,9 @@ async function analyzeMedicalDocument(text: string, type: 'prescription' | 'repo
 }
 
 async function scanPrescriptionImage(base64Image: string) {
+  const ai = getAI();
+  if (!ai) throw new Error("AI Scan is unavailable because the API key is not configured.");
+
   const model = "gemini-3-flash-preview";
   const prompt = `You are an expert medical transcriptionist. Analyze this prescription image and extract the following information in JSON format:
   {
@@ -178,6 +196,47 @@ async function scanPrescriptionImage(base64Image: string) {
 }
 
 // --- Components ---
+
+class ErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("App Crash:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center space-y-4 border border-red-100">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto">
+              <AlertCircle size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Something went wrong</h1>
+            <p className="text-slate-600">The application encountered an error and couldn't start properly.</p>
+            <div className="bg-slate-50 p-4 rounded-2xl text-left text-xs font-mono text-red-500 overflow-auto max-h-40">
+              {this.state.error?.toString()}
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, icon: Icon }: any) => {
   const baseStyles = "flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
@@ -257,6 +316,14 @@ const Modal = ({ isOpen, onClose, title, children }: any) => (
 // --- Main App ---
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
