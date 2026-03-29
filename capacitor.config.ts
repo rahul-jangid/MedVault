@@ -5,12 +5,9 @@ const config: CapacitorConfig = {
   appName: 'MedVault',
   webDir: 'dist',
   server: {
-    iosScheme: 'https',
     androidScheme: 'https',
-    hostname: 'localhost',
+    iosScheme: 'capacitor',
     allowNavigation: [
-      'localhost',
-      'https://localhost',
       'gen-lang-client-0597938563.firebaseapp.com',
       '*.firebaseapp.com',
       '*.google.com',
@@ -20,8 +17,9 @@ const config: CapacitorConfig = {
       'https://ais-dev-oqpwo4vcu45abrkrsxegym-749674698439.asia-southeast1.run.app'
     ]
   },
-  // Spoof a modern mobile Safari user agent to bypass Google's 403 disallowed_useragent
-  overrideUserAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+  // Spoof a Desktop Chrome user agent. Google often allows this in WebViews 
+  // because it thinks it's a desktop browser, bypassing the "disallowed_useragent" block.
+  overrideUserAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
 };
 
 export default config;

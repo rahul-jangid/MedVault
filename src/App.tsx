@@ -458,33 +458,24 @@ function AppContent() {
     };
   }, []);
 
-  const handleLogin = async (method: 'popup' | 'redirect' | 'manual' = 'popup') => {
+  const handleLogin = async (method: 'popup' | 'redirect' = 'popup') => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
     setLoginMethod(method);
     setDebugInfo(prev => prev + `\nLogin Start: ${method}`);
     
     try {
-      if (method === 'manual') {
-        // Force navigation to the auth domain inside the app's WebView
-        // This allows the redirect to https://localhost to work correctly
-        const config = (await import('../firebase-applet-config.json')).default;
-        const redirectUrl = "https://localhost";
-        const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(redirectUrl)}`;
-        
-        console.log("Manual redirect inside WebView to:", manualUrl);
-        setDebugInfo(prev => prev + `\nManual Nav: ${redirectUrl}`);
-        
-        window.location.href = manualUrl;
-        return;
-      }
-
       if (method === 'redirect') {
         console.log("Using signInWithRedirect");
+        setDebugInfo(prev => prev + "\nRedirecting...");
         await signInWithRedirect(auth, googleProvider);
       } else {
         console.log("Using signInWithPopup");
-        await signInWithPopup(auth, googleProvider);
+        setDebugInfo(prev => prev + "\nOpening Popup...");
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log("Popup login success:", result.user.uid);
+        setDebugInfo(prev => prev + "\nPopup Success");
+        setUser(result.user);
       }
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -493,7 +484,7 @@ function AppContent() {
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
         setLoadingError("Popup was blocked. Please try the 'Redirect Login' button below.");
       } else if (error.code === 'auth/disallowed-useragent') {
-        setLoadingError("Google is blocking this browser. Please ensure you've updated the Capacitor config with the spoofed User Agent.");
+        setLoadingError("Google is blocking this browser. Please try 'Redirect Login' or check your User Agent settings.");
       } else {
         setLoadingError(`Login failed: ${error.message}`);
       }
@@ -573,15 +564,6 @@ function AppContent() {
               disabled={isLoggingIn}
             >
               {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
-            </Button>
-
-            <Button 
-              onClick={() => handleLogin('manual')} 
-              variant="ghost"
-              className="w-full py-2 text-sm text-slate-400" 
-              disabled={isLoggingIn}
-            >
-              Emergency Manual Login
             </Button>
           </div>
 
