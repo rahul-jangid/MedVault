@@ -247,6 +247,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
     secondary: "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
     danger: "bg-red-50 text-red-600 border border-red-100 hover:bg-red-100",
     ghost: "bg-transparent text-gray-600 hover:bg-gray-100",
+    outline: "bg-transparent text-indigo-600 border-2 border-indigo-600 hover:bg-indigo-50",
     accent: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md"
   };
 
@@ -333,6 +334,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<'popup' | 'redirect' | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prescriptions' | 'reports' | 'profile'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -439,38 +441,30 @@ function AppContent() {
     };
   }, []);
 
-  const handleLogin = async () => {
+  const handleLogin = async (method: 'popup' | 'redirect' = 'popup') => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
-    console.log("Starting login process...");
+    setLoginMethod(method);
+    console.log(`Starting login process with ${method}...`);
     
     try {
-      // For mobile environments, redirect is much more reliable than popup
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        console.log("Mobile detected, using signInWithRedirect");
+      if (method === 'redirect') {
+        console.log("Using signInWithRedirect");
         await signInWithRedirect(auth, googleProvider);
       } else {
-        console.log("Desktop detected, using signInWithPopup");
+        console.log("Using signInWithPopup");
         await signInWithPopup(auth, googleProvider);
       }
     } catch (error: any) {
       console.error("Login Error:", error);
       // If popup is blocked or cancelled, try redirect as fallback
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
-        console.log("Popup failed, falling back to redirect...");
-        try {
-          await signInWithRedirect(auth, googleProvider);
-        } catch (redirectError) {
-          console.error("Redirect fallback error:", redirectError);
-          setLoadingError("Login failed. Please try again.");
-        }
+        console.log("Popup failed, suggesting redirect...");
+        setLoadingError("Popup was blocked or cancelled. Please try the 'Redirect Login' method below.");
       } else {
         setLoadingError(`Login failed: ${error.message}`);
       }
     } finally {
-      // Note: For redirect, this won't be reached as the page navigates away
       setIsLoggingIn(false);
     }
   };
@@ -527,14 +521,34 @@ function AppContent() {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">MedVault</h1>
           <p className="text-slate-500 mb-8">Your secure, AI-powered health companion. Manage prescriptions and reports with ease.</p>
-          <Button 
-            onClick={handleLogin} 
-            className="w-full py-4 text-lg" 
-            icon={isLoggingIn ? Loader2 : User}
-            disabled={isLoggingIn}
-          >
-            {isLoggingIn ? "Logging in..." : "Sign in with Google"}
-          </Button>
+          
+          <div className="space-y-3">
+            <Button 
+              onClick={() => handleLogin('popup')} 
+              className="w-full py-4 text-lg" 
+              icon={isLoggingIn && loginMethod === 'popup' ? Loader2 : User}
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn && loginMethod === 'popup' ? "Logging in..." : "Sign in with Google"}
+            </Button>
+
+            <Button 
+              onClick={() => handleLogin('redirect')} 
+              variant="outline"
+              className="w-full py-4 text-lg" 
+              icon={isLoggingIn && loginMethod === 'redirect' ? Loader2 : ArrowLeft}
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
+            </Button>
+          </div>
+
+          {loadingError && (
+            <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-2xl text-xs text-center">
+              {loadingError}
+            </div>
+          )}
+
           <p className="mt-6 text-xs text-slate-400">
             By signing in, you agree to our Terms of Service and Privacy Policy.
           </p>

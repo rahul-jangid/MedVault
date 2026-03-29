@@ -5,7 +5,13 @@ const config: CapacitorConfig = {
   appName: 'MedVault',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    allowNavigation: [
+      '*.firebaseapp.com',
+      '*.google.com',
+      '*.googleusercontent.com',
+      'ais-dev-oqpwo4vcu45abrkrsxegym-749674698439.asia-southeast1.run.app'
+    ]
   }
 };
 
