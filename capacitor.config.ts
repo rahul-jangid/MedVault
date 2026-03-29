@@ -10,7 +10,9 @@ const config: CapacitorConfig = {
       '*.firebaseapp.com',
       '*.google.com',
       '*.googleusercontent.com',
-      'ais-dev-oqpwo4vcu45abrkrsxegym-749674698439.asia-southeast1.run.app'
+      'accounts.google.com',
+      'https://accounts.google.com/*',
+      'https://ais-dev-oqpwo4vcu45abrkrsxegym-749674698439.asia-southeast1.run.app'
     ]
   }
 };

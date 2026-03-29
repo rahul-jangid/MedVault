@@ -1,13 +1,39 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { 
+  initializeAuth, 
+  indexedDBLocalPersistence, 
+  browserLocalPersistence,
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  signOut 
+} from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase SDK
+console.log("Firebase: Initializing app...");
 const app = initializeApp(firebaseConfig);
+
+console.log("Firebase: Initializing auth with persistence...");
+// Use initializeAuth to explicitly set persistence which is more reliable in WebViews
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+});
+
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export const clearAuth = async () => {
+  try {
+    await auth.signOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    console.log("Auth cleared");
+  } catch (e) {
+    console.error("Error clearing auth", e);
+  }
+};
 
 // Error handling helper
 export enum OperationType {

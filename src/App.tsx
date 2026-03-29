@@ -41,7 +41,8 @@ import {
   query,
   where,
   handleFirestoreError,
-  OperationType
+  OperationType,
+  clearAuth
 } from './firebase';
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
@@ -334,7 +335,8 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<'popup' | 'redirect' | null>(null);
+  const [loginMethod, setLoginMethod] = useState<'popup' | 'redirect' | 'manual' | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prescriptions' | 'reports' | 'profile'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -346,6 +348,7 @@ function AppContent() {
 
   useEffect(() => {
     console.log("App initialized, setting up auth listener...");
+    setDebugInfo(prev => prev + "\nApp Init");
     let unsubPres: (() => void) | null = null;
     let unsubReports: (() => void) | null = null;
 
@@ -360,15 +363,20 @@ function AppContent() {
     getRedirectResult(auth).then((result) => {
       if (result) {
         console.log("Redirect login success:", result.user.uid);
+        setDebugInfo(prev => prev + "\nRedirect Success");
         setUser(result.user);
+      } else {
+        setDebugInfo(prev => prev + "\nNo Redirect Result");
       }
     }).catch((error) => {
       console.error("Redirect login error:", error);
+      setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
       setLoadingError(`Login failed: ${error.message}`);
     });
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       console.log("Auth state changed:", user ? `User ${user.uid}` : "No user");
+      setDebugInfo(prev => prev + "\nAuth Change: " + (user ? "User" : "None"));
       
       // Cleanup previous listeners if any
       if (unsubPres) unsubPres();
@@ -441,13 +449,22 @@ function AppContent() {
     };
   }, []);
 
-  const handleLogin = async (method: 'popup' | 'redirect' = 'popup') => {
+  const handleLogin = async (method: 'popup' | 'redirect' | 'manual' = 'popup') => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
     setLoginMethod(method);
-    console.log(`Starting login process with ${method}...`);
+    setDebugInfo(prev => prev + `\nLogin Start: ${method}`);
     
     try {
+      if (method === 'manual') {
+        // Force navigation to the auth domain
+        const config = (await import('../firebase-applet-config.json')).default;
+        const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(window.location.href)}`;
+        console.log("Manual redirect to:", manualUrl);
+        window.location.href = manualUrl;
+        return;
+      }
+
       if (method === 'redirect') {
         console.log("Using signInWithRedirect");
         await signInWithRedirect(auth, googleProvider);
@@ -457,10 +474,10 @@ function AppContent() {
       }
     } catch (error: any) {
       console.error("Login Error:", error);
+      setDebugInfo(prev => prev + `\nLogin Error: ${error.code}`);
       // If popup is blocked or cancelled, try redirect as fallback
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
-        console.log("Popup failed, suggesting redirect...");
-        setLoadingError("Popup was blocked or cancelled. Please try the 'Redirect Login' method below.");
+        setLoadingError("Popup was blocked or cancelled. Please try 'Redirect Login' or 'Manual Login'.");
       } else {
         setLoadingError(`Login failed: ${error.message}`);
       }
@@ -541,6 +558,15 @@ function AppContent() {
             >
               {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
             </Button>
+
+            <Button 
+              onClick={() => handleLogin('manual')} 
+              variant="ghost"
+              className="w-full py-2 text-sm text-slate-400" 
+              disabled={isLoggingIn}
+            >
+              Emergency Manual Login
+            </Button>
           </div>
 
           {loadingError && (
@@ -548,6 +574,22 @@ function AppContent() {
               {loadingError}
             </div>
           )}
+
+          <div className="mt-8 p-4 bg-slate-100 rounded-xl text-[10px] font-mono text-slate-400 text-left overflow-auto max-h-24">
+            <div className="flex justify-between items-center mb-1">
+              <p className="font-bold">Debug Console:</p>
+              <button 
+                onClick={() => {
+                  clearAuth();
+                  window.location.reload();
+                }}
+                className="text-indigo-600 underline"
+              >
+                Clear Auth
+              </button>
+            </div>
+            <pre>{debugInfo}</pre>
+          </div>
 
           <p className="mt-6 text-xs text-slate-400">
             By signing in, you agree to our Terms of Service and Privacy Policy.
