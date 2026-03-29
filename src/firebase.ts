@@ -1,8 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  initializeAuth, 
-  indexedDBLocalPersistence, 
-  browserLocalPersistence,
+  getAuth,
   GoogleAuthProvider, 
   signInWithPopup, 
   signInWithRedirect, 
@@ -15,14 +13,11 @@ import firebaseConfig from '../firebase-applet-config.json';
 console.log("Firebase: Initializing app...");
 const app = initializeApp(firebaseConfig);
 
-console.log("Firebase: Initializing auth with persistence...");
-// Use initializeAuth to explicitly set persistence which is more reliable in WebViews
-export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence]
-});
+console.log("Firebase: Initializing auth...");
+export const auth = getAuth(app);
+console.log("Auth initialized:", !!auth, typeof auth);
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const googleProvider = new GoogleAuthProvider();
 
 export const clearAuth = async () => {
   try {
@@ -88,4 +83,4 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 // Connection test removed from top-level to prevent startup hang
-export { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc };
+export { collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc };

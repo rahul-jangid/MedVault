@@ -26,11 +26,6 @@ import { Browser } from '@capacitor/browser';
 import { 
   auth, 
   db, 
-  googleProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signOut, 
   collection, 
   doc, 
   setDoc, 
@@ -45,6 +40,7 @@ import {
   OperationType,
   clearAuth
 } from './firebase';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, GoogleAuthProvider } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
 import { LineChart, 
@@ -361,26 +357,31 @@ function AppContent() {
     }, 10000); // 10 second timeout
 
     // Check for redirect result
-    if (auth) {
-      getRedirectResult(auth).then((result) => {
-        if (result) {
-          console.log("Redirect login success:", result.user.uid);
-          setDebugInfo(prev => prev + "\nRedirect Success");
-          setUser(result.user);
-        } else {
-          setDebugInfo(prev => prev + "\nNo Redirect Result");
-        }
-      }).catch((error) => {
-        // Only log if it's not a common "no result" error
-        if (error.code !== 'auth/no-auth-event') {
-          console.error("Redirect login error:", error);
-          setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
-          // Don't show error to user if it's just an argument error from an empty redirect
-          if (error.code !== 'auth/argument-error') {
-            setLoadingError(`Login failed: ${error.message}`);
+    if (auth && typeof getRedirectResult === 'function') {
+      console.log("Checking redirect result with auth:", !!auth);
+      try {
+        getRedirectResult(auth).then((result) => {
+          if (result) {
+            console.log("Redirect login success:", result.user.uid);
+            setDebugInfo(prev => prev + "\nRedirect Success");
+            setUser(result.user);
+          } else {
+            setDebugInfo(prev => prev + "\nNo Redirect Result");
           }
-        }
-      });
+        }).catch((error) => {
+          // Only log if it's not a common "no result" error
+          if (error.code !== 'auth/no-auth-event') {
+            console.error("Redirect login error:", error);
+            setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
+            // Don't show error to user if it's just an argument error from an empty redirect
+            if (error.code !== 'auth/argument-error') {
+              setLoadingError(`Login failed: ${error.message}`);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("getRedirectResult sync error:", e);
+      }
     }
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -464,15 +465,27 @@ function AppContent() {
     setLoginMethod(method);
     setDebugInfo(prev => prev + `\nLogin Start: ${method}`);
     
+    console.log(`Attempting login with method: ${method}`);
+    console.log("Auth object:", !!auth);
+    
+    const provider = new GoogleAuthProvider();
+    console.log("Provider object created:", !!provider);
+
+    if (!auth) {
+      setLoadingError("Auth not initialized properly.");
+      setIsLoggingIn(false);
+      return;
+    }
+    
     try {
       if (method === 'redirect') {
         console.log("Using signInWithRedirect");
         setDebugInfo(prev => prev + "\nRedirecting...");
-        await signInWithRedirect(auth, googleProvider);
+        await signInWithRedirect(auth, provider);
       } else {
         console.log("Using signInWithPopup");
         setDebugInfo(prev => prev + "\nOpening Popup...");
-        const result = await signInWithPopup(auth, googleProvider);
+        const result = await signInWithPopup(auth, provider);
         console.log("Popup login success:", result.user.uid);
         setDebugInfo(prev => prev + "\nPopup Success");
         setUser(result.user);
