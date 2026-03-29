@@ -27,6 +27,8 @@ import {
   db, 
   googleProvider, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   collection, 
   doc, 
@@ -330,6 +332,7 @@ function AppContent() {
   const [reports, setReports] = useState<LabReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prescriptions' | 'reports' | 'profile'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -350,6 +353,17 @@ function AppContent() {
         setLoading(false);
       }
     }, 10000); // 10 second timeout
+
+    // Check for redirect result
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        console.log("Redirect login success:", result.user.uid);
+        setUser(result.user);
+      }
+    }).catch((error) => {
+      console.error("Redirect login error:", error);
+      setLoadingError(`Login failed: ${error.message}`);
+    });
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       console.log("Auth state changed:", user ? `User ${user.uid}` : "No user");
@@ -426,10 +440,38 @@ function AppContent() {
   }, []);
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    console.log("Starting login process...");
+    
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+      // For mobile environments, redirect is much more reliable than popup
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        console.log("Mobile detected, using signInWithRedirect");
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        console.log("Desktop detected, using signInWithPopup");
+        await signInWithPopup(auth, googleProvider);
+      }
+    } catch (error: any) {
       console.error("Login Error:", error);
+      // If popup is blocked or cancelled, try redirect as fallback
+      if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
+        console.log("Popup failed, falling back to redirect...");
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          console.error("Redirect fallback error:", redirectError);
+          setLoadingError("Login failed. Please try again.");
+        }
+      } else {
+        setLoadingError(`Login failed: ${error.message}`);
+      }
+    } finally {
+      // Note: For redirect, this won't be reached as the page navigates away
+      setIsLoggingIn(false);
     }
   };
 
@@ -485,8 +527,13 @@ function AppContent() {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">MedVault</h1>
           <p className="text-slate-500 mb-8">Your secure, AI-powered health companion. Manage prescriptions and reports with ease.</p>
-          <Button onClick={handleLogin} className="w-full py-4 text-lg" icon={User}>
-            Sign in with Google
+          <Button 
+            onClick={handleLogin} 
+            className="w-full py-4 text-lg" 
+            icon={isLoggingIn ? Loader2 : User}
+            disabled={isLoggingIn}
+          >
+            {isLoggingIn ? "Logging in..." : "Sign in with Google"}
           </Button>
           <p className="mt-6 text-xs text-slate-400">
             By signing in, you agree to our Terms of Service and Privacy Policy.
