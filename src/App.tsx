@@ -359,28 +359,33 @@ function AppContent() {
     // Check for redirect result
     if (auth && typeof getRedirectResult === 'function') {
       console.log("Checking redirect result with auth:", !!auth);
+      setDebugInfo(prev => prev + "\nChecking Redirect Result...");
       try {
         getRedirectResult(auth).then((result) => {
+          console.log("getRedirectResult resolved:", !!result);
           if (result) {
             console.log("Redirect login success:", result.user.uid);
-            setDebugInfo(prev => prev + "\nRedirect Success");
+            setDebugInfo(prev => prev + "\nRedirect Success: " + result.user.uid);
             setUser(result.user);
           } else {
+            console.log("No redirect result found.");
             setDebugInfo(prev => prev + "\nNo Redirect Result");
           }
         }).catch((error) => {
+          console.error("getRedirectResult promise error:", error);
+          setDebugInfo(prev => prev + "\nRedirect Promise Error: " + error.code);
           // Only log if it's not a common "no result" error
           if (error.code !== 'auth/no-auth-event') {
-            console.error("Redirect login error:", error);
-            setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
+            console.error("Redirect login error details:", error);
             // Don't show error to user if it's just an argument error from an empty redirect
             if (error.code !== 'auth/argument-error') {
-              setLoadingError(`Login failed: ${error.message}`);
+              setLoadingError(`Redirect failed: ${error.message}`);
             }
           }
         });
       } catch (e) {
         console.error("getRedirectResult sync error:", e);
+        setDebugInfo(prev => prev + "\nRedirect Sync Error");
       }
     }
 
@@ -479,15 +484,24 @@ function AppContent() {
     
     try {
       if (method === 'redirect') {
-        console.log("Using signInWithRedirect");
-        setDebugInfo(prev => prev + "\nRedirecting...");
+        console.log("Calling signInWithRedirect...");
+        setDebugInfo(prev => prev + "\nCalling Redirect...");
         await signInWithRedirect(auth, provider);
+        console.log("signInWithRedirect call completed (app should redirect now)");
       } else {
-        console.log("Using signInWithPopup");
-        setDebugInfo(prev => prev + "\nOpening Popup...");
-        const result = await signInWithPopup(auth, provider);
+        console.log("Calling signInWithPopup...");
+        setDebugInfo(prev => prev + "\nCalling Popup...");
+        
+        // Add a safety timeout for the popup
+        const popupPromise = signInWithPopup(auth, provider);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Popup timed out after 30 seconds")), 30000)
+        );
+        
+        const result = await Promise.race([popupPromise, timeoutPromise]) as any;
+        
         console.log("Popup login success:", result.user.uid);
-        setDebugInfo(prev => prev + "\nPopup Success");
+        setDebugInfo(prev => prev + "\nPopup Success: " + result.user.uid);
         setUser(result.user);
       }
     } catch (error: any) {
