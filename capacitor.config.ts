@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: 'MedVault',
   webDir: 'dist',
   server: {
+    iosScheme: 'https',
     androidScheme: 'https',
+    hostname: 'localhost',
     allowNavigation: [
       '*.firebaseapp.com',
       '*.google.com',

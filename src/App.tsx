@@ -360,19 +360,27 @@ function AppContent() {
     }, 10000); // 10 second timeout
 
     // Check for redirect result
-    getRedirectResult(auth).then((result) => {
-      if (result) {
-        console.log("Redirect login success:", result.user.uid);
-        setDebugInfo(prev => prev + "\nRedirect Success");
-        setUser(result.user);
-      } else {
-        setDebugInfo(prev => prev + "\nNo Redirect Result");
-      }
-    }).catch((error) => {
-      console.error("Redirect login error:", error);
-      setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
-      setLoadingError(`Login failed: ${error.message}`);
-    });
+    if (auth) {
+      getRedirectResult(auth).then((result) => {
+        if (result) {
+          console.log("Redirect login success:", result.user.uid);
+          setDebugInfo(prev => prev + "\nRedirect Success");
+          setUser(result.user);
+        } else {
+          setDebugInfo(prev => prev + "\nNo Redirect Result");
+        }
+      }).catch((error) => {
+        // Only log if it's not a common "no result" error
+        if (error.code !== 'auth/no-auth-event') {
+          console.error("Redirect login error:", error);
+          setDebugInfo(prev => prev + "\nRedirect Error: " + error.code);
+          // Don't show error to user if it's just an argument error from an empty redirect
+          if (error.code !== 'auth/argument-error') {
+            setLoadingError(`Login failed: ${error.message}`);
+          }
+        }
+      });
+    }
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       console.log("Auth state changed:", user ? `User ${user.uid}` : "No user");
@@ -459,8 +467,11 @@ function AppContent() {
       if (method === 'manual') {
         // Force navigation to the auth domain
         const config = (await import('../firebase-applet-config.json')).default;
-        const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(window.location.href)}`;
+        // Use https://localhost as the redirect URL since we updated capacitor.config.ts
+        const redirectUrl = "https://localhost";
+        const manualUrl = `https://${config.authDomain}/__/auth/handler?apiKey=${config.apiKey}&appName=${encodeURIComponent("[DEFAULT]")}&authType=signInViaRedirect&providerId=google.com&scopes=profile%20email&redirectUrl=${encodeURIComponent(redirectUrl)}`;
         console.log("Manual redirect to:", manualUrl);
+        setDebugInfo(prev => prev + `\nManual Nav: ${redirectUrl}`);
         window.location.href = manualUrl;
         return;
       }
