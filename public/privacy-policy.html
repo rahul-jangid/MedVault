@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Arogyam</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.7;
+            color: #333;
+            background: #f8fafc;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 2em;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 0.95em;
+        }
+        h2 {
+            font-size: 1.3em;
+            color: #1a1a2e;
+            margin-top: 28px;
+            margin-bottom: 12px;
+        }
+        p, li {
+            color: #444;
+            margin-bottom: 12px;
+        }
+        ul {
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+        li { margin-bottom: 6px; }
+        .highlight {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #888;
+            font-size: 0.9em;
+        }
+        a { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Privacy Policy</h1>
+        <p class="subtitle">Arogyam — Your Medical Records Vault<br>Last updated: April 1, 2026</p>
+
+        <div class="highlight">
+            <strong>Summary:</strong> Arogyam stores your medical data securely in your own Google/Firebase account. We do not sell, share, or access your personal health information. Your data is yours.
+        </div>
+
+        <h2>1. Introduction</h2>
+        <p>Arogyam ("the App") is a personal medical records management application developed by Rahul Jangid. This Privacy Policy explains how we collect, use, and protect your information when you use our App.</p>
+
+        <h2>2. Information We Collect</h2>
+        <p>When you use Arogyam, we may collect the following information:</p>
+        <ul>
+            <li><strong>Google Account Information:</strong> When you sign in with Google, we receive your name, email address, and profile picture to create your account.</li>
+            <li><strong>Medical Records:</strong> Prescriptions, lab reports, and other medical documents you voluntarily upload to the App.</li>
+            <li><strong>Family Member Information:</strong> Names and medical records of family members you choose to add.</li>
+            <li><strong>Photos:</strong> Images you capture using the camera or select from your photo library for scanning prescriptions and medical documents.</li>
+        </ul>
+
+        <h2>3. How We Use Your Information</h2>
+        <p>Your information is used solely for the following purposes:</p>
+        <ul>
+            <li>To authenticate your identity via Google Sign-In</li>
+            <li>To store and organize your medical records securely</li>
+            <li>To use AI (Google Gemini) to extract information from prescription images for your convenience</li>
+            <li>To provide you access to your records across devices</li>
+        </ul>
+
+        <h2>4. Data Storage & Security</h2>
+        <p>All your medical data is stored in <strong>Google Firebase (Firestore & Storage)</strong>, which is encrypted at rest and in transit. Your data is associated with your Google account and is only accessible by you when authenticated.</p>
+        <ul>
+            <li>Data is encrypted using industry-standard TLS encryption in transit</li>
+            <li>Data at rest is encrypted by Google Firebase infrastructure</li>
+            <li>We use Firebase Security Rules to ensure only authenticated users can access their own data</li>
+            <li>We do not store your data on any additional servers</li>
+        </ul>
+
+        <h2>5. AI Processing</h2>
+        <p>When you use the prescription scanning feature, your prescription images are sent to <strong>Google Gemini API</strong> for text extraction. This processing is done in real-time and we do not store prescription images on any server beyond your Firebase storage. Google's AI services have their own privacy policies governing data processing.</p>
+
+        <h2>6. Third-Party Services</h2>
+        <p>Arogyam uses the following third-party services:</p>
+        <ul>
+            <li><strong>Google Firebase:</strong> Authentication, database, and file storage — <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase Privacy Policy</a></li>
+            <li><strong>Google Sign-In:</strong> User authentication — <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+            <li><strong>Google Gemini AI:</strong> Prescription text extraction — <a href="https://ai.google.dev/terms" target="_blank">Gemini Terms of Service</a></li>
+        </ul>
+
+        <h2>7. Data Sharing</h2>
+        <div class="highlight">
+            <strong>We do NOT:</strong>
+            <ul style="margin-bottom: 0;">
+                <li>Sell your personal or medical data to anyone</li>
+                <li>Share your data with advertisers</li>
+                <li>Access your medical records for any purpose</li>
+                <li>Use your data for marketing or analytics</li>
+                <li>Transfer your data to any third party beyond the services listed above</li>
+            </ul>
+        </div>
+
+        <h2>8. Data Retention & Deletion</h2>
+        <p>Your data is retained as long as you maintain your account. You can delete your data at any time by:</p>
+        <ul>
+            <li>Deleting individual prescriptions, lab reports, or family members within the App</li>
+            <li>Contacting us at the email below to request complete account deletion</li>
+        </ul>
+        <p>Upon account deletion, all associated data will be permanently removed from our Firebase database within 30 days.</p>
+
+        <h2>9. Children's Privacy</h2>
+        <p>Arogyam is not intended for use by children under 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us.</p>
+
+        <h2>10. Camera & Photo Library Access</h2>
+        <p>Arogyam requests access to your device's camera and photo library solely for the purpose of capturing or selecting medical documents (prescriptions, lab reports) for storage and AI-powered text extraction. Images are stored only in your private Firebase storage.</p>
+
+        <h2>11. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. Any changes will be reflected on this page with an updated "Last updated" date. Continued use of the App after changes constitutes acceptance of the revised policy.</p>
+
+        <h2>12. Contact Us</h2>
+        <p>If you have any questions about this Privacy Policy or wish to request data deletion, please contact us:</p>
+        <ul>
+            <li><strong>Developer:</strong> Rahul Jangid</li>
+            <li><strong>Email:</strong> <a href="mailto:rahuljangid0000@gmail.com">rahuljangid0000@gmail.com</a></li>
+            <li><strong>GitHub:</strong> <a href="https://github.com/rahul-jangid/MedVault" target="_blank">github.com/rahul-jangid/MedVault</a></li>
+        </ul>
+
+        <div class="footer">
+            <p>© 2026 Rahul Jangid. All rights reserved. Arogyam — Your Medical Records Vault.</p>
+        </div>
+    </div>
+</body>
+</html>
