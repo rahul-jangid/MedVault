@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.medvault.app',
+  appId: 'com.rahuljangid.medvault',
   appName: 'MedVault',
   webDir: 'dist',
   server: {
