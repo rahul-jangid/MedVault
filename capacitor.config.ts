@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.rahuljangid.medvault',
-  appName: 'MedVault',
+  appName: 'Arogyam',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

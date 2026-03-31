@@ -578,7 +578,7 @@ function AppContent() {
         >
           <Loader2 size={48} />
         </motion.div>
-        <p className="text-slate-500 font-medium animate-pulse">Securing your medical vault...</p>
+        <p className="text-slate-500 font-medium animate-pulse">Loading Arogyam...</p>
         {loadingError && (
           <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-2xl text-xs max-w-xs text-center">
             Error: {loadingError}
@@ -595,7 +595,7 @@ function AppContent() {
           <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <Activity size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">MedVault</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Arogyam</h1>
           <p className="text-slate-500 mb-8">Your secure, AI-powered health companion. Manage prescriptions and reports with ease.</p>
           
           <div className="space-y-3">
@@ -657,7 +657,7 @@ function AppContent() {
           <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center">
             <Activity size={24} />
           </div>
-          <span className="text-xl font-bold text-slate-900">MedVault</span>
+          <span className="text-xl font-bold text-slate-900">Arogyam</span>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -714,7 +714,7 @@ function AppContent() {
              <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center">
               <Activity size={18} />
             </div>
-            <h1 className="text-lg font-bold text-slate-900">MedVault</h1>
+            <h1 className="text-lg font-bold text-slate-900">Arogyam</h1>
           </div>
 
           <div className="hidden md:block">
@@ -831,7 +831,7 @@ function AppContent() {
                         <div className="p-2 bg-white/20 rounded-lg">
                           <BrainCircuit size={20} />
                         </div>
-                        <span className="font-bold">MedVault AI</span>
+                        <span className="font-bold">Arogyam AI</span>
                       </div>
                       <p className="text-indigo-100 text-sm leading-relaxed mb-6">
                         Based on your recent records, you've had 3 checkups this month. Your hemoglobin levels are improving. Keep following your iron-rich diet.
