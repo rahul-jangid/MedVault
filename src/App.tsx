@@ -1012,6 +1012,17 @@ function AppContent() {
                   >
                     Save Profile Changes
                   </Button>
+
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                    <Button 
+                      variant="danger" 
+                      className="w-full py-4" 
+                      icon={LogOut}
+                      onClick={handleLogout}
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
                 </Card>
               </motion.div>
             )}
