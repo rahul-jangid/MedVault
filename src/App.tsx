@@ -40,7 +40,7 @@ import {
   OperationType,
   clearAuth
 } from './firebase';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, signInWithCredential, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
@@ -545,6 +545,67 @@ function AppContent() {
     }
   };
 
+  const handleAppleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    setLoginMethod('manual');
+    setDebugInfo(prev => prev + "\nApple Login Start");
+
+    if (!auth) {
+      setLoadingError("Auth not initialized properly.");
+      setIsLoggingIn(false);
+      return;
+    }
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        console.log("Using native Apple Sign-In via Capacitor...");
+        setDebugInfo(prev => prev + "\nNative Apple Sign-In...");
+
+        const result = await FirebaseAuthentication.signInWithApple();
+        console.log("Native Apple sign-in result:", !!result.credential);
+        setDebugInfo(prev => prev + "\nApple credential received");
+
+        const idToken = result.credential?.idToken;
+        const nonce = result.credential?.nonce;
+        if (idToken) {
+          const provider = new OAuthProvider('apple.com');
+          const credential = provider.credential({ idToken, rawNonce: nonce });
+          const userCredential = await signInWithCredential(auth, credential);
+          console.log("Firebase Apple sign-in success:", userCredential.user.uid);
+          setDebugInfo(prev => prev + "\nApple sign-in success: " + userCredential.user.uid);
+          setUser(userCredential.user);
+        } else {
+          throw new Error("No ID token received from Apple sign-in.");
+        }
+      } else {
+        // Web fallback — use popup
+        const provider = new OAuthProvider('apple.com');
+        provider.addScope('email');
+        provider.addScope('name');
+        console.log("Calling signInWithPopup for Apple...");
+        setDebugInfo(prev => prev + "\nApple Popup...");
+
+        const result = await signInWithPopup(auth, provider);
+        console.log("Apple popup login success:", result.user.uid);
+        setDebugInfo(prev => prev + "\nApple Popup Success: " + result.user.uid);
+        setUser(result.user);
+      }
+    } catch (error: any) {
+      console.error("Apple Login Error:", error);
+      setDebugInfo(prev => prev + `\nApple Login Error: ${error.code || error.message}`);
+
+      if (error.message?.includes('canceled') || error.message?.includes('cancelled') || error.code === 'auth/popup-closed-by-user') {
+        console.log("User cancelled Apple sign-in");
+        setDebugInfo(prev => prev + "\nUser cancelled Apple sign-in");
+      } else {
+        setLoadingError(`Apple login failed: ${error.message}`);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -617,6 +678,22 @@ function AppContent() {
             >
               {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
             </Button>
+
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-slate-400">or</span></div>
+            </div>
+
+            <button
+              onClick={handleAppleLogin}
+              disabled={isLoggingIn}
+              className="w-full py-4 text-lg font-medium bg-black text-white rounded-xl flex items-center justify-center gap-3 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+              </svg>
+              {isLoggingIn && loginMethod === 'manual' ? "Signing in..." : "Sign in with Apple"}
+            </button>
           </div>
 
           {loadingError && (
