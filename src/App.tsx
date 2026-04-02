@@ -18,7 +18,6 @@ import {
   BrainCircuit,
   Stethoscope,
   FlaskConical,
-  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -669,16 +668,6 @@ function AppContent() {
               {isLoggingIn && loginMethod === 'popup' ? "Logging in..." : "Sign in with Google"}
             </Button>
 
-            <Button 
-              onClick={() => handleLogin('redirect')} 
-              variant="outline"
-              className="w-full py-4 text-lg" 
-              icon={isLoggingIn && loginMethod === 'redirect' ? Loader2 : ArrowLeft}
-              disabled={isLoggingIn}
-            >
-              {isLoggingIn && loginMethod === 'redirect' ? "Redirecting..." : "Try Redirect Login"}
-            </Button>
-
             <div className="relative my-2">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
               <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-slate-400">or</span></div>
@@ -701,22 +690,6 @@ function AppContent() {
               {loadingError}
             </div>
           )}
-
-          <div className="mt-8 p-4 bg-slate-100 rounded-xl text-[10px] font-mono text-slate-400 text-left overflow-auto max-h-24">
-            <div className="flex justify-between items-center mb-1">
-              <p className="font-bold">Debug Console:</p>
-              <button 
-                onClick={() => {
-                  clearAuth();
-                  window.location.reload();
-                }}
-                className="text-indigo-600 underline"
-              >
-                Clear Auth
-              </button>
-            </div>
-            <pre>{debugInfo}</pre>
-          </div>
 
           <p className="mt-6 text-xs text-slate-400">
             By signing in, you agree to our Terms of Service and Privacy Policy.
