@@ -35,6 +35,7 @@ import {
   deleteDoc,
   query,
   where,
+  getDocs,
   handleFirestoreError,
   OperationType,
   clearAuth
@@ -342,6 +343,9 @@ function AppContent() {
   const [isScanPrescriptionOpen, setIsScanPrescriptionOpen] = useState(false);
   const [isAddReportOpen, setIsAddReportOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     console.log("App initialized, setting up auth listener...");
@@ -610,6 +614,44 @@ function AppContent() {
       await signOut(auth);
     } catch (error) {
       console.error("Logout Error:", error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE' || !user) return;
+    setIsDeletingAccount(true);
+    try {
+      const uid = user.uid;
+      // 1. Delete all prescriptions
+      const presSnap = await getDocs(collection(db, 'users', uid, 'prescriptions'));
+      for (const d of presSnap.docs) {
+        await deleteDoc(doc(db, 'users', uid, 'prescriptions', d.id));
+      }
+      // 2. Delete all reports
+      const reportsSnap = await getDocs(collection(db, 'users', uid, 'reports'));
+      for (const d of reportsSnap.docs) {
+        await deleteDoc(doc(db, 'users', uid, 'reports', d.id));
+      }
+      // 3. Delete user profile document
+      await deleteDoc(doc(db, 'users', uid));
+      // 4. Delete Firebase Auth account
+      await user.delete();
+      // 5. Clean up
+      setIsDeleteAccountOpen(false);
+      setDeleteConfirmText('');
+      setUser(null);
+      setProfile(null);
+      setPrescriptions([]);
+      setReports([]);
+    } catch (error: any) {
+      console.error("Delete Account Error:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        alert('For security, please sign out and sign back in, then try deleting your account again.');
+      } else {
+        alert(`Failed to delete account: ${error.message}`);
+      }
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -1063,7 +1105,7 @@ function AppContent() {
                     Save Profile Changes
                   </Button>
 
-                  <div className="mt-6 pt-6 border-t border-slate-100">
+                  <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
                     <Button 
                       variant="danger" 
                       className="w-full py-4" 
@@ -1072,6 +1114,12 @@ function AppContent() {
                     >
                       Sign Out
                     </Button>
+                    <button
+                      onClick={() => setIsDeleteAccountOpen(true)}
+                      className="w-full py-3 text-sm text-red-400 hover:text-red-600 hover:underline transition-colors"
+                    >
+                      Delete Account
+                    </button>
                   </div>
                 </Card>
               </motion.div>
@@ -1118,6 +1166,76 @@ function AppContent() {
           }
         }}
       />
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal 
+        isOpen={isDeleteAccountOpen} 
+        onClose={() => { setIsDeleteAccountOpen(false); setDeleteConfirmText(''); }}
+        title="Delete Account"
+      >
+        <div className="space-y-6">
+          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto">
+            <AlertCircle size={32} />
+          </div>
+          <div className="text-center space-y-2">
+            <h4 className="text-lg font-bold text-slate-900">This action is permanent</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Deleting your account will permanently remove all your data including:
+            </p>
+            <ul className="text-sm text-slate-600 space-y-1">
+              <li>• All saved prescriptions ({prescriptions.length})</li>
+              <li>• All lab reports ({reports.length})</li>
+              <li>• Your health profile and personal data</li>
+              <li>• Your login credentials</li>
+            </ul>
+            <p className="text-sm text-red-600 font-bold mt-4">This cannot be undone.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Type DELETE to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-center font-mono text-lg tracking-widest"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="secondary" 
+              className="flex-1 py-4"
+              onClick={() => { setIsDeleteAccountOpen(false); setDeleteConfirmText(''); }}
+            >
+              Cancel
+            </Button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE' || isDeletingAccount}
+              className={`flex-1 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
+                deleteConfirmText === 'DELETE' && !isDeletingAccount
+                  ? 'bg-red-600 hover:bg-red-700 active:scale-95'
+                  : 'bg-red-300 cursor-not-allowed'
+              }`}
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={18} />
+                  Delete Forever
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
