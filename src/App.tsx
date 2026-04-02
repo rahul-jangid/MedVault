@@ -18,6 +18,8 @@ import {
   BrainCircuit,
   Stethoscope,
   FlaskConical,
+  Shield,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -107,6 +109,8 @@ interface UserProfile {
   bloodGroup?: string;
   dateOfBirth?: string;
   allergies?: string[];
+  aiConsentGiven?: boolean;
+  aiConsentDate?: string;
 }
 
 // --- AI Service ---
@@ -346,6 +350,9 @@ function AppContent() {
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isAiConsentOpen, setIsAiConsentOpen] = useState(false);
+  const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
+  const [isFabOpen, setIsFabOpen] = useState(false);
 
   useEffect(() => {
     console.log("App initialized, setting up auth listener...");
@@ -655,6 +662,43 @@ function AppContent() {
     }
   };
 
+  // AI Consent gate: checks if user has consented, if not shows modal
+  const requireAiConsent = (action: () => void) => {
+    if (profile?.aiConsentGiven) {
+      action();
+    } else {
+      setPendingAiAction(() => action);
+      setIsAiConsentOpen(true);
+    }
+  };
+
+  const handleAiConsentAccept = async () => {
+    if (!user || !profile) return;
+    try {
+      const updatedProfile = { 
+        ...profile, 
+        aiConsentGiven: true, 
+        aiConsentDate: new Date().toISOString() 
+      };
+      await setDoc(doc(db, 'users', user.uid), updatedProfile);
+      setProfile(updatedProfile);
+      setIsAiConsentOpen(false);
+      // Execute the pending action
+      if (pendingAiAction) {
+        pendingAiAction();
+        setPendingAiAction(null);
+      }
+    } catch (err) {
+      console.error("Failed to save AI consent:", err);
+      handleFirestoreError(err, OperationType.UPDATE, 'users');
+    }
+  };
+
+  const handleAiConsentDecline = () => {
+    setIsAiConsentOpen(false);
+    setPendingAiAction(null);
+  };
+
   const filteredPrescriptions = useMemo(() => {
     return prescriptions.filter(p => 
       p.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -814,39 +858,24 @@ function AppContent() {
             <p className="text-sm text-slate-500">Welcome back, {user.displayName?.split(' ')[0]}</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative hidden sm:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search records..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 w-64 transition-all"
-              />
+          {(activeTab === 'prescriptions' || activeTab === 'reports') && (
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Search records..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 w-40 sm:w-64 transition-all"
+                />
+              </div>
             </div>
-            {activeTab === 'prescriptions' && (
-              <Button 
-                variant="secondary" 
-                onClick={() => setIsScanPrescriptionOpen(true)}
-                icon={BrainCircuit}
-                className="text-indigo-600 border-indigo-100"
-              >
-                <span className="hidden sm:inline">Scan AI</span>
-              </Button>
-            )}
-            <Button 
-              variant="accent" 
-              onClick={() => activeTab === 'reports' ? setIsAddReportOpen(true) : setIsAddPrescriptionOpen(true)}
-              icon={Plus}
-            >
-              <span className="hidden sm:inline">Add New</span>
-            </Button>
-          </div>
+          )}
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && (
               <motion.div 
@@ -955,13 +984,7 @@ function AppContent() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h3 className="text-xl font-bold text-slate-900">Your Prescriptions</h3>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={Filter}>Filter</Button>
-                    <Button variant="accent" icon={Plus} onClick={() => setIsAddPrescriptionOpen(true)}>Add New</Button>
-                  </div>
-                </div>
+                <h3 className="text-xl font-bold text-slate-900">Your Prescriptions</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredPrescriptions.map(p => (
@@ -985,13 +1008,7 @@ function AppContent() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h3 className="text-xl font-bold text-slate-900">Lab Reports</h3>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={Filter}>Filter</Button>
-                    <Button variant="accent" icon={Plus} onClick={() => setIsAddReportOpen(true)}>Add New</Button>
-                  </div>
-                </div>
+                <h3 className="text-xl font-bold text-slate-900">Lab Reports</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredReports.map(r => (
@@ -1127,12 +1144,88 @@ function AppContent() {
           </AnimatePresence>
         </div>
 
+        {/* FAB - Upload Button */}
+        <div className="fixed z-40 right-5 bottom-24 md:bottom-8">
+          <AnimatePresence>
+            {isFabOpen && (
+              <>
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsFabOpen(false)}
+                  className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-30"
+                />
+                <motion.div 
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 20, scale: 0.8 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  className="absolute bottom-16 right-0 z-40 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-56"
+                >
+                  <button
+                    onClick={() => { setIsFabOpen(false); requireAiConsent(() => setIsScanPrescriptionOpen(true)); }}
+                    className="w-full flex items-center gap-3 px-5 py-4 hover:bg-indigo-50 transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                      <BrainCircuit size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Scan Prescription</p>
+                      <p className="text-[10px] text-slate-400">AI-powered scan</p>
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-50" />
+                  <button
+                    onClick={() => { setIsFabOpen(false); setIsAddPrescriptionOpen(true); }}
+                    className="w-full flex items-center gap-3 px-5 py-4 hover:bg-indigo-50 transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
+                      <Stethoscope size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Add Prescription</p>
+                      <p className="text-[10px] text-slate-400">Enter manually</p>
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-50" />
+                  <button
+                    onClick={() => { setIsFabOpen(false); setIsAddReportOpen(true); }}
+                    className="w-full flex items-center gap-3 px-5 py-4 hover:bg-emerald-50 transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                      <FlaskConical size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Add Lab Report</p>
+                      <p className="text-[10px] text-slate-400">Test results</p>
+                    </div>
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => setIsFabOpen(!isFabOpen)}
+            className={`relative z-40 flex items-center gap-2 px-5 py-3.5 rounded-full shadow-lg font-bold text-white transition-colors ${
+              isFabOpen 
+                ? 'bg-slate-800 hover:bg-slate-900' 
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            <Plus size={20} className={`transition-transform duration-200 ${isFabOpen ? 'rotate-45' : ''}`} />
+            <span className="text-sm">{isFabOpen ? 'Close' : 'Upload'}</span>
+          </motion.button>
+        </div>
+
         {/* Mobile Nav */}
-        <nav className="md:hidden bg-white border-t border-slate-100 p-2 flex items-center justify-around sticky bottom-0 z-10">
-          <MobileNavLink active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={Activity} />
-          <MobileNavLink active={activeTab === 'prescriptions'} onClick={() => setActiveTab('prescriptions')} icon={Stethoscope} />
-          <MobileNavLink active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={FlaskConical} />
-          <MobileNavLink active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={User} />
+        <nav className="md:hidden bg-white border-t border-slate-100 p-2 pb-[env(safe-area-inset-bottom,8px)] flex items-center justify-around fixed bottom-0 left-0 right-0 z-50">
+          <MobileNavLink active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={Activity} label="Home" />
+          <MobileNavLink active={activeTab === 'prescriptions'} onClick={() => setActiveTab('prescriptions')} icon={Stethoscope} label="Prescriptions" />
+          <MobileNavLink active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={FlaskConical} label="Reports" />
+          <MobileNavLink active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={User} label="Profile" />
         </nav>
       </main>
 
@@ -1236,6 +1329,112 @@ function AppContent() {
           </div>
         </div>
       </Modal>
+
+      {/* AI Data Sharing Consent Modal */}
+      <Modal 
+        isOpen={isAiConsentOpen} 
+        onClose={handleAiConsentDecline}
+        title="AI Data Sharing Consent"
+      >
+        <div className="space-y-6">
+          <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Shield size={32} />
+          </div>
+
+          <div className="text-center space-y-2">
+            <h4 className="text-lg font-bold text-slate-900">Before using AI features</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Arogyam uses <strong>Google Gemini AI</strong> to analyze your medical documents. Please review what data is shared and provide your consent.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-5 space-y-4">
+            <div className="space-y-2">
+              <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <FileText size={14} className="text-indigo-600" />
+                What data is sent
+              </h5>
+              <ul className="text-sm text-slate-600 space-y-1 pl-5">
+                <li>• Prescription images (photos of handwritten or printed prescriptions)</li>
+                <li>• Medication names, dosages, frequencies, and durations</li>
+                <li>• Doctor names and hospital/clinic names</li>
+                <li>• Lab report parameters, values, and reference ranges</li>
+                <li>• Any notes you add to your medical records</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <ExternalLink size={14} className="text-indigo-600" />
+                Who receives this data
+              </h5>
+              <p className="text-sm text-slate-600 pl-5">
+                Your data is sent to <strong>Google</strong> via the <strong>Gemini API</strong> for AI processing. Google processes this data according to their{' '}
+                <a 
+                  href="https://ai.google.dev/terms" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-indigo-600 underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    Browser.open({ url: 'https://ai.google.dev/terms' });
+                  }}
+                >
+                  Gemini API Terms of Service
+                </a>.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Shield size={14} className="text-indigo-600" />
+                How your data is protected
+              </h5>
+              <ul className="text-sm text-slate-600 space-y-1 pl-5">
+                <li>• Data is sent over encrypted (TLS) connections</li>
+                <li>• Data is processed in real-time and not stored by the AI beyond processing</li>
+                <li>• No personal identifiers (email, account ID) are sent to the AI</li>
+                <li>• You can use the app without AI features if you decline</li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 text-center leading-relaxed">
+            You can review our full{' '}
+            <a 
+              href="/privacy-policy.html" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-indigo-600 underline"
+              onClick={(e) => {
+                e.preventDefault();
+                Browser.open({ url: 'https://rahul-jangid.github.io/MedVault/privacy-policy.html' });
+              }}
+            >
+              Privacy Policy
+            </a>{' '}
+            for more details. You can withdraw consent at any time from your profile settings.
+          </p>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="secondary" 
+              className="flex-1 py-4"
+              onClick={handleAiConsentDecline}
+            >
+              Decline
+            </Button>
+            <Button 
+              variant="primary" 
+              className="flex-1 py-4"
+              icon={CheckCircle2}
+              onClick={handleAiConsentAccept}
+            >
+              I Agree
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -1256,14 +1455,15 @@ const SidebarLink = ({ active, onClick, icon: Icon, label }: any) => (
   </button>
 );
 
-const MobileNavLink = ({ active, onClick, icon: Icon }: any) => (
+const MobileNavLink = ({ active, onClick, icon: Icon, label }: any) => (
   <button 
     onClick={onClick}
-    className={`p-3 rounded-xl transition-all ${
-      active ? "text-indigo-600 bg-indigo-50" : "text-slate-400"
+    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all min-w-[60px] ${
+      active ? "text-indigo-600" : "text-slate-400"
     }`}
   >
-    <Icon size={24} />
+    <Icon size={22} />
+    <span className="text-[10px] font-medium leading-tight">{label}</span>
   </button>
 );
 

@@ -66,7 +66,7 @@
 <body>
     <div class="container">
         <h1>🔒 Privacy Policy</h1>
-        <p class="subtitle">Arogyam — Your Medical Records Vault<br>Last updated: April 1, 2026</p>
+        <p class="subtitle">Arogyam — Your Medical Records Vault<br>Last updated: April 3, 2026</p>
 
         <div class="highlight">
             <strong>Summary:</strong> Arogyam stores your medical data securely in your own Google/Firebase account. We do not sell, share, or access your personal health information. Your data is yours.
@@ -102,8 +102,49 @@
             <li>We do not store your data on any additional servers</li>
         </ul>
 
-        <h2>5. AI Processing</h2>
-        <p>When you use the prescription scanning feature, your prescription images are sent to <strong>Google Gemini API</strong> for text extraction. This processing is done in real-time and we do not store prescription images on any server beyond your Firebase storage. Google's AI services have their own privacy policies governing data processing.</p>
+        <h2>5. AI Processing & Third-Party Data Sharing</h2>
+        <div class="highlight">
+            <strong>Important:</strong> This app uses a third-party AI service. Before any data is sent to the AI, you will be asked for your explicit consent inside the app. AI features are optional — the app works without them.
+        </div>
+        <p>When you choose to use AI-powered features (prescription scanning, AI summaries, or lab report analysis), specific medical data is sent to <strong>Google</strong> via the <strong>Google Gemini API</strong> for processing. Below is a detailed breakdown:</p>
+        
+        <p><strong>5.1 What data is sent to Google Gemini AI:</strong></p>
+        <ul>
+            <li>Prescription images (photos of handwritten or printed prescriptions)</li>
+            <li>Medication names, dosages, frequencies, and durations</li>
+            <li>Doctor names and hospital/clinic names</li>
+            <li>Lab report test parameters, values, units, and reference ranges</li>
+            <li>Any notes you add to your medical records</li>
+        </ul>
+
+        <p><strong>5.2 What data is NOT sent to Google Gemini AI:</strong></p>
+        <ul>
+            <li>Your email address or Google account information</li>
+            <li>Your Firebase user ID or authentication tokens</li>
+            <li>Your date of birth, blood group, or allergies</li>
+            <li>Any data from records where you have not triggered an AI feature</li>
+        </ul>
+
+        <p><strong>5.3 Who receives this data:</strong></p>
+        <ul>
+            <li><strong>Google LLC</strong> — via the Gemini API. Google processes this data under their <a href="https://ai.google.dev/terms" target="_blank">Gemini API Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a>.</li>
+        </ul>
+
+        <p><strong>5.4 How the data is processed:</strong></p>
+        <ul>
+            <li>Data is transmitted over encrypted (TLS) connections</li>
+            <li>Data is processed in real-time for text extraction or analysis</li>
+            <li>We do not store AI processing results on any server beyond your personal Firebase storage</li>
+            <li>Google's Gemini API processes data according to their published data handling policies</li>
+        </ul>
+
+        <p><strong>5.5 Your consent:</strong></p>
+        <ul>
+            <li>Before any data is sent to Google Gemini AI, the app displays a detailed consent dialog explaining exactly what data will be shared and with whom</li>
+            <li>You must explicitly agree ("I Agree") before any AI feature can be used</li>
+            <li>If you decline, all non-AI features of the app continue to work normally</li>
+            <li>Your consent preference is stored in your profile and can be withdrawn at any time</li>
+        </ul>
 
         <h2>6. Third-Party Services</h2>
         <p>Arogyam uses the following third-party services:</p>
