@@ -60,6 +60,8 @@
 	<string>Arogyam needs access to your photo library to upload prescriptions, lab reports, and other medical documents.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Arogyam needs access to your camera to scan and capture prescriptions, lab reports, and medical documents.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Arogyam needs access to save photos of prescriptions and medical documents to your photo library.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>

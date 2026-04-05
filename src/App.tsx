@@ -133,7 +133,7 @@ async function analyzeMedicalDocument(text: string, type: 'prescription' | 'repo
   const ai = getAI();
   if (!ai) return "AI Analysis is unavailable because the API key is not configured.";
   
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-2.5-flash";
   const prompt = type === 'prescription' 
     ? `Analyze this medical prescription text and provide a clear, patient-friendly summary. Include:
        1. Doctor and Hospital names if found.
@@ -164,7 +164,7 @@ async function scanPrescriptionImage(base64Image: string) {
   const ai = getAI();
   if (!ai) throw new Error("AI Scan is unavailable because the API key is not configured.");
 
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-2.5-flash";
   const prompt = `You are an expert medical transcriptionist. Analyze this prescription image and extract the following information in JSON format:
   {
     "doctorName": "string",
@@ -266,8 +266,8 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
   );
 };
 
-const Card = ({ children, className = '', id }: any) => (
-  <div id={id} className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${className}`}>
+const Card = ({ children, className = '', id, onClick }: any) => (
+  <div id={id} onClick={onClick} className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${className}`}>
     {children}
   </div>
 );
@@ -353,6 +353,8 @@ function AppContent() {
   const [isAiConsentOpen, setIsAiConsentOpen] = useState(false);
   const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [aiHealthSummary, setAiHealthSummary] = useState<string | null>(null);
+  const [isAnalyzingHealth, setIsAnalyzingHealth] = useState(false);
 
   useEffect(() => {
     console.log("App initialized, setting up auth listener...");
@@ -699,6 +701,68 @@ function AppContent() {
     setPendingAiAction(null);
   };
 
+  const handleFullAnalysis = async () => {
+    if (isAnalyzingHealth) return; // Prevent double-tap
+    if (prescriptions.length === 0 && reports.length === 0) {
+      alert('Add some prescriptions or lab reports first to get an AI health analysis.');
+      return;
+    }
+    setIsAnalyzingHealth(true);
+    setAiHealthSummary(null);
+    try {
+      const ai = getAI();
+      if (!ai) {
+        setAiHealthSummary("AI Analysis is unavailable because the API key is not configured.");
+        return;
+      }
+
+      // Build a compact summary of all records (exclude image data to save tokens)
+      const recordsSummary = {
+        profile: {
+          bloodGroup: profile?.bloodGroup || 'Unknown',
+          dateOfBirth: profile?.dateOfBirth || 'Unknown',
+          allergies: profile?.allergies || [],
+        },
+        prescriptions: prescriptions.map(p => ({
+          date: p.date,
+          doctor: p.doctorName,
+          hospital: p.hospitalName,
+          medications: p.medications,
+          notes: p.notes,
+        })),
+        labReports: reports.map(r => ({
+          date: r.date,
+          testName: r.testName,
+          lab: r.labName,
+          results: r.results,
+        })),
+      };
+
+      const prompt = `You are a friendly health assistant for the Arogyam app. Based on the following medical records, provide a personalized health overview in Markdown format. Include:
+
+1. **Summary** — A brief overview of the patient's health journey based on available data.
+2. **Key Observations** — Notable trends in medications, lab results, or visit frequency.
+3. **Areas of Attention** — Any lab values outside normal range, recurring prescriptions, or potential concerns.
+4. **Suggestions** — Lifestyle tips or follow-up questions the patient could ask their doctor.
+
+Keep it concise (under 400 words), empathetic, and always include a disclaimer that this is not a medical diagnosis.
+
+Patient Records:
+${JSON.stringify(recordsSummary, null, 2)}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      setAiHealthSummary(response.text || "Unable to generate analysis.");
+    } catch (error) {
+      console.error("Full Analysis Error:", error);
+      setAiHealthSummary("Failed to generate health analysis. Please try again later.");
+    } finally {
+      setIsAnalyzingHealth(false);
+    }
+  };
+
   const filteredPrescriptions = useMemo(() => {
     return prescriptions.filter(p => 
       p.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -954,12 +1018,47 @@ function AppContent() {
                         </div>
                         <span className="font-bold">Arogyam AI</span>
                       </div>
-                      <p className="text-indigo-100 text-sm leading-relaxed mb-6">
-                        Based on your recent records, you've had 3 checkups this month. Your hemoglobin levels are improving. Keep following your iron-rich diet.
-                      </p>
-                      <Button variant="secondary" className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        Get Full Analysis
-                      </Button>
+
+                      {isAnalyzingHealth ? (
+                        <div className="flex flex-col items-center py-6">
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="mb-3"
+                          >
+                            <Loader2 size={28} />
+                          </motion.div>
+                          <p className="text-indigo-200 text-sm">Analyzing your health records...</p>
+                        </div>
+                      ) : aiHealthSummary ? (
+                        <div className="mb-4">
+                          <div className="prose prose-sm max-w-none text-sm leading-relaxed max-h-64 overflow-y-auto [&_*]:!text-white">
+                            <Markdown>{aiHealthSummary}</Markdown>
+                          </div>
+                          <Button 
+                            variant="secondary" 
+                            className="w-full mt-4 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                            onClick={() => requireAiConsent(handleFullAnalysis)}
+                            disabled={isAnalyzingHealth}
+                          >
+                            Refresh Analysis
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-indigo-100 text-sm leading-relaxed mb-6">
+                            Tap below to get a personalized AI health overview based on all your prescriptions and lab reports.
+                          </p>
+                          <Button 
+                            variant="secondary" 
+                            className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                            onClick={() => requireAiConsent(handleFullAnalysis)}
+                            disabled={isAnalyzingHealth}
+                          >
+                            Get Full Analysis
+                          </Button>
+                        </>
+                      )}
                     </Card>
 
                     {/* Quick Profile */}
@@ -1121,6 +1220,70 @@ function AppContent() {
                   >
                     Save Profile Changes
                   </Button>
+
+                  {/* AI Data Sharing Section */}
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <BrainCircuit size={20} />
+                      </div>
+                      <h4 className="font-bold text-slate-900">AI Data Sharing</h4>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-2xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 mr-4">
+                          <p className="text-sm font-bold text-slate-900">AI Analysis</p>
+                          <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                            Allow Arogyam to send medical data to Google Gemini AI for analysis and summaries.
+                          </p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (profile?.aiConsentGiven) {
+                              // Revoke consent
+                              if (confirm('Are you sure? AI features like prescription scanning and health analysis will be disabled.')) {
+                                try {
+                                  const updatedProfile = { ...profile, aiConsentGiven: false, aiConsentDate: '' };
+                                  await setDoc(doc(db, 'users', user.uid), updatedProfile);
+                                  setProfile(updatedProfile);
+                                } catch (err) {
+                                  handleFirestoreError(err, OperationType.UPDATE, 'users');
+                                }
+                              }
+                            } else {
+                              // Re-consent: show full consent modal
+                              setIsAiConsentOpen(true);
+                            }
+                          }}
+                          className={`relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0 ${
+                            profile?.aiConsentGiven ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`}
+                        >
+                          <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-200 ${
+                            profile?.aiConsentGiven ? 'right-0.5' : 'left-0.5'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {profile?.aiConsentGiven && profile?.aiConsentDate && (
+                        <p className="text-[10px] text-slate-400">
+                          Consent given on: {format(new Date(profile.aiConsentDate), 'MMM d, yyyy')}
+                        </p>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          Browser.open({ url: 'https://htmlpreview.github.io/?https://github.com/rahul-jangid/MedVault/blob/main/public/privacy-policy.html' });
+                        }}
+                        className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink size={12} />
+                        View Privacy Policy
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
                     <Button 
@@ -1408,7 +1571,7 @@ function AppContent() {
               className="text-indigo-600 underline"
               onClick={(e) => {
                 e.preventDefault();
-                Browser.open({ url: 'https://rahul-jangid.github.io/MedVault/privacy-policy.html' });
+                Browser.open({ url: 'https://htmlpreview.github.io/?https://github.com/rahul-jangid/MedVault/blob/main/public/privacy-policy.html' });
               }}
             >
               Privacy Policy
@@ -1707,37 +1870,44 @@ const ScanPrescriptionModal = ({ isOpen, onClose, userId }: any) => {
       <div className="space-y-6">
         {step === 'upload' && (
           <div className="space-y-4">
-            {Capacitor.isNativePlatform() && (
-              <Button 
+            {Capacitor.isNativePlatform() ? (
+              <div 
                 onClick={handleNativeCamera}
-                className="w-full py-6 rounded-3xl flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+                className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative group"
               >
-                <Camera size={24} />
-                <span className="text-lg font-semibold">Take Photo</span>
-              </Button>
-            )}
-            
-            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative group">
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleFileChange}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
-                <Upload size={32} />
-              </div>
-              <p className="font-bold text-slate-900">
-                {Capacitor.isNativePlatform() ? 'Or Choose from Gallery' : 'Upload Prescription Photo'}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">Take a clear photo of the handwritten note</p>
-              {error && (
-                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm">
-                  <AlertCircle size={16} />
-                  {error}
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
+                  <Camera size={32} />
                 </div>
-              )}
-            </div>
+                <p className="font-bold text-slate-900">Capture or Upload Prescription</p>
+                <p className="text-sm text-slate-500 mt-1">Take a photo or choose from your files</p>
+                {error && (
+                  <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm">
+                    <AlertCircle size={16} />
+                    {error}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative group">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
+                  <Upload size={32} />
+                </div>
+                <p className="font-bold text-slate-900">Capture or Upload Prescription</p>
+                <p className="text-sm text-slate-500 mt-1">Take a photo or choose from your files</p>
+                {error && (
+                  <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm">
+                    <AlertCircle size={16} />
+                    {error}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

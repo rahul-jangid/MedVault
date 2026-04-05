@@ -3,45 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: /users/{userId}
-    // Document ID: userId (string)
-    // Fields:
-    //   - uid: string (required, immutable) - User ID
-    //   - displayName: string (optional) - User's name
-    //   - email: string (required) - User's email
-    //   - bloodGroup: string (optional) - Blood group
-    //   - dateOfBirth: string (optional, ISO 8601) - Date of birth
-    //   - allergies: list (optional) - List of allergies
-    //
-    // Collection: /users/{userId}/prescriptions/{prescriptionId}
-    // Fields:
-    //   - userId: string (required, immutable) - Owner ID
-    //   - doctorName: string (required) - Doctor's name
-    //   - hospitalName: string (optional) - Hospital name
-    //   - date: string (required, ISO 8601) - Prescription date
-    //   - medications: list (optional) - List of medications
-    //   - notes: string (optional) - Additional notes
-    //   - imageUrl: string (optional) - Image link
-    //   - imageData: string (optional) - Base64 encoded image data
-    //   - aiSummary: string (optional) - AI generated summary
-    //
-    // Collection: /users/{userId}/reports/{reportId}
-    // Fields:
-    //   - userId: string (required, immutable) - Owner ID
-    //   - testName: string (required) - Test name
-    //   - labName: string (optional) - Lab name
-    //   - date: string (required, ISO 8601) - Report date
-    //   - results: list (optional) - Test results
-    //   - imageUrl: string (optional) - Image link
-    //   - imageData: string (optional) - Base64 encoded image data
-    //   - aiAnalysis: string (optional) - AI generated analysis
-    //
-    // ===============================================================
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     
@@ -53,52 +14,15 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    // Max document size guard (prevents field abuse)
+    function hasReasonableFieldCount() {
+      return request.resource.data.keys().size() < 20;
     }
 
-    function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUser(data) {
-      return data.uid is string && data.uid.size() > 0 &&
-             data.email is string && isValidEmail(data.email) &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('bloodGroup' in data) || (data.bloodGroup is string && data.bloodGroup.size() < 5)) &&
-             (!('dateOfBirth' in data) || isValidDateString(data.dateOfBirth)) &&
-             (!('allergies' in data) || data.allergies is list);
-    }
-
-    function isValidPrescription(data) {
-      return data.userId is string && data.userId.size() > 0 &&
-             data.doctorName is string && data.doctorName.size() > 0 && data.doctorName.size() < 100 &&
-             isValidDateString(data.date) &&
-             (!('hospitalName' in data) || (data.hospitalName is string && data.hospitalName.size() < 100)) &&
-             (!('medications' in data) || data.medications is list) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000)) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
-             (!('imageData' in data) || (data.imageData is string && data.imageData.size() < 800000)) &&
-             (!('aiSummary' in data) || (data.aiSummary is string && data.aiSummary.size() < 5000));
-    }
-
-    function isValidReport(data) {
-      return data.userId is string && data.userId.size() > 0 &&
-             data.testName is string && data.testName.size() > 0 && data.testName.size() < 100 &&
-             isValidDateString(data.date) &&
-             (!('labName' in data) || (data.labName is string && data.labName.size() < 100)) &&
-             (!('results' in data) || data.results is list) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
-             (!('imageData' in data) || (data.imageData is string && data.imageData.size() < 800000)) &&
-             (!('aiAnalysis' in data) || (data.aiAnalysis is string && data.aiAnalysis.size() < 5000));
+    // Asset size guards (prevents cost abuse from large base64 images)
+    function imageDataWithinLimit() {
+      return !('imageData' in request.resource.data) || 
+             request.resource.data.imageData.size() < 1500000;
     }
 
     // ===============================================================
@@ -107,26 +31,31 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      request.resource.data.uid == resource.data.uid;
+      allow create: if isOwner(userId) && hasReasonableFieldCount();
+      allow update: if isOwner(userId) && hasReasonableFieldCount();
       allow delete: if isOwner(userId);
 
       match /prescriptions/{prescriptionId} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidPrescription(request.resource.data) &&
-                        request.resource.data.userId == userId;
-        allow update: if isOwner(userId) && isValidPrescription(request.resource.data) &&
-                        request.resource.data.userId == resource.data.userId;
+        allow create: if isOwner(userId) && 
+                        request.resource.data.userId == userId &&
+                        hasReasonableFieldCount() &&
+                        imageDataWithinLimit();
+        allow update: if isOwner(userId) && 
+                        hasReasonableFieldCount() &&
+                        imageDataWithinLimit();
         allow delete: if isOwner(userId);
       }
 
       match /reports/{reportId} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidReport(request.resource.data) &&
-                        request.resource.data.userId == userId;
-        allow update: if isOwner(userId) && isValidReport(request.resource.data) &&
-                        request.resource.data.userId == resource.data.userId;
+        allow create: if isOwner(userId) && 
+                        request.resource.data.userId == userId &&
+                        hasReasonableFieldCount() &&
+                        imageDataWithinLimit();
+        allow update: if isOwner(userId) && 
+                        hasReasonableFieldCount() &&
+                        imageDataWithinLimit();
         allow delete: if isOwner(userId);
       }
     }
